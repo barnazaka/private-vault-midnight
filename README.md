@@ -4,7 +4,6 @@
 
 Private Vault lets you store and verify secrets on-chain **without ever revealing them**. The actual secret stays on your machine — only a ZK-proven hash commitment touches the blockchain.
 
-Built for the [INTO THE MIDNIGHT Hackathon](https://midnight.network) — **Identity & Governance** track.
 
 ---
 
@@ -240,17 +239,6 @@ Your `vault-session.json` owner key doesn't match the deployed contract. Either 
 
 **ZK proof generation is slow**
 Normal! First-time proof generation can take 30–60 seconds as keys are loaded. Subsequent proofs are faster.
-
----
-
-## Hackathon track
-
-This submission targets the **Identity & Governance** track. Private Vault demonstrates:
-
-- Selective disclosure: labels are public, secrets are private
-- Ownership proofs without identity reveal
-- Rotation without ever exposing the old or new secret
-- A foundation for private credential management, API key vaults, PIN systems, and compliance-ready secret attestation
 
 ---
 
