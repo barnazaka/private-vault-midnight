@@ -1,0 +1,123 @@
+pragma language_version 0.22;
+
+import CompactStandardLibrary;
+
+// ─── Ledger State ───────────────────────────────────────────────────────────
+//
+// owner_key   : public hash of the owner's secret key — proves ownership
+//               without revealing the actual secret key
+// secret_hash : public hash commitment of the stored secret — proves the
+//               secret exists and was set, without revealing its content
+// label       : a short public display name for this vault entry
+// is_set      : whether this vault has been initialized
+// entry_count : tracks how many updates have been made (audit trail)
+//
+export ledger owner_key: Bytes<32>;
+export ledger secret_hash: Bytes<32>;
+export ledger label: Bytes<32>;
+export ledger is_set: Boolean;
+export ledger entry_count: Counter;
+
+// ─── Witnesses ──────────────────────────────────────────────────────────────
+//
+// These are private — they live only on the user's local machine.
+// The ZK proof proves the witness was used correctly WITHOUT revealing it.
+//
+witness ownerSecretKey(): Bytes<32>;
+witness secretValue(): Bytes<32>;
+
+// ─── Helper circuits ────────────────────────────────────────────────────────
+
+circuit deriveOwnerKey(sk: Bytes<32>, nonce: Field): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>(
+    [pad(32, "midnight:private-vault:owner"), nonce as Bytes<32>, sk]
+  );
+}
+
+circuit deriveSecretHash(secret: Bytes<32>, nonce: Field): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>(
+    [pad(32, "midnight:private-vault:secret"), nonce as Bytes<32>, secret]
+  );
+}
+
+// ─── Constructor ────────────────────────────────────────────────────────────
+//
+// Called once on deployment. Sets up the vault with the owner's
+// public key commitment. The actual secret key never leaves the user's machine.
+//
+constructor() {
+  const sk = ownerSecretKey();
+  owner_key = disclose(deriveOwnerKey(sk, entry_count as Field));
+  is_set = disclose(false);
+  entry_count.increment(1);
+}
+
+// ─── Circuits ───────────────────────────────────────────────────────────────
+
+// Store a secret: proves you know the owner key, stores hash of the secret.
+// The actual secret value NEVER touches the ledger.
+export circuit storeSecret(vaultLabel: Bytes<32>): [] {
+  // Prove caller knows the owner secret key
+  const sk = ownerSecretKey();
+  assert(
+    owner_key == deriveOwnerKey(sk, (entry_count as Field) - 1 as Field),
+    "Not the vault owner"
+  );
+
+  // Hash the secret locally — only the hash goes on-chain
+  const secret = secretValue();
+  secret_hash = disclose(deriveSecretHash(secret, entry_count as Field));
+  label = disclose(vaultLabel);
+  is_set = disclose(true);
+  entry_count.increment(1);
+}
+
+// Verify a secret: proves you know the secret that matches the stored hash.
+// Returns true commitment — no secret revealed on chain.
+export circuit verifySecret(): Boolean {
+  assert(is_set == true, "Vault is empty");
+
+  const secret = secretValue();
+  const computed = deriveSecretHash(secret, (entry_count as Field) - 1 as Field);
+  const matches = (computed == secret_hash);
+  return disclose(matches);
+}
+
+// Rotate secret: prove you know old secret, replace with new one atomically.
+// Old secret and new secret both stay private.
+export circuit rotateSecret(): [] {
+  assert(is_set == true, "Vault is empty, nothing to rotate");
+
+  // Prove you know the CURRENT secret before rotating
+  const sk = ownerSecretKey();
+  assert(
+    owner_key == deriveOwnerKey(sk, (entry_count as Field) - 2 as Field),
+    "Not the vault owner"
+  );
+
+  const secret = secretValue();
+  assert(
+    secret_hash == deriveSecretHash(secret, (entry_count as Field) - 1 as Field),
+    "Current secret does not match — cannot rotate"
+  );
+
+  // Now store new secret hash (secretValue() will return the NEW secret in the witness)
+  // The contract re-calls the witness for the new value
+  const newSecret = secretValue();
+  secret_hash = disclose(deriveSecretHash(newSecret, entry_count as Field));
+  entry_count.increment(1);
+}
+
+// Clear vault: owner wipes the secret hash. Proves ownership first.
+export circuit clearVault(): [] {
+  const sk = ownerSecretKey();
+  assert(
+    owner_key == deriveOwnerKey(sk, (entry_count as Field) - 1 as Field),
+    "Not the vault owner"
+  );
+
+  secret_hash = disclose(pad(32, "midnight:private-vault:empty"));
+  label = disclose(pad(32, ""));
+  is_set = disclose(false);
+  entry_count.increment(1);
+}

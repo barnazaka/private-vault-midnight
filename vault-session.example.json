@@ -1,0 +1,5 @@
+{
+  "contractAddress": "0xabc123...your_vault_contract_address_here",
+  "ownerSecretKeyHex": "deadbeef...your_32_byte_owner_key_in_hex",
+  "walletSeedHex": ""
+}

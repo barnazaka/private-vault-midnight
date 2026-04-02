@@ -1,0 +1,16 @@
+{
+  "name": "@midnight-ntwrk/vault-cli",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+  "preprod": "tsx src/preprod.ts",
+  "build": "rm -rf dist && tsc --project tsconfig.build.json",
+  "lint": "eslint src",
+  "typecheck": "tsc -p tsconfig.json --noEmit"
+},
+  "dependencies": {
+    "@midnight-ntwrk/vault-contract": "*"
+  }
+}
