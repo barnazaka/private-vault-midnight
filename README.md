@@ -1,4 +1,4 @@
-# 🔐 Private Vault 0
+# 🔐 Private Vault 
 
 > Zero-Knowledge Secret Storage on the Midnight Network
 
